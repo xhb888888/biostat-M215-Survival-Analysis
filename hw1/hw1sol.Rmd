@@ -163,9 +163,9 @@ following studies:
 (b) The example studying the time to death for breast cancer patients
     described in section 1.5.
 
-**(a) Answer:** Type I censoring
+**(a) Answer:** Type I censoring.	The study was conducted over a fixed duration, so participants who had not relapsed by the end of the study were censored at that point.
 
-**(b) Answer:** Type I censoring
+**(b) Answer:** Type I censoring. The censoring was caused by the fixed study period of 10 years. Patients who were alive at the end of the study were censored at that time.
 
 # Exercise 3.2
 
@@ -206,7 +206,7 @@ the inclusion criteria.
 individual was alive and disease-free at enrollment (age 50) and
 observed until their death from unrelated causes.
 
-**(d) Answer:** Competing risk censoring. No truncation applies. The
+**(d) Answer:** Progressive Type I censoring. No truncation applies. The
 individual was disease-free at enrollment and included in the study
 until they moved away.
 
@@ -234,14 +234,13 @@ $\lambda$ which maximizes this likelihood.
     repeat question 1.
 
 (c) Using the exponential AFT model to test if 6-MP is effective in pro-
-    longing remission duration in comparison with the placebo group at $\alpha$
-    = 0.05. Be specific about the model and hypotheses, and find the
-    p-value.
+    longing remission duration in comparison with the placebo group at
+    $\alpha$ = 0.05. Be specific about the model and hypotheses, and
+    find the p-value.
 
 (d) Repeat part (c) using the Weibull AFT model. Do you observe any
     differences between the results from the two models? If so, try to
     explain why they are different?
-
 
 Given the data in section 1.2:
 
@@ -271,7 +270,6 @@ Given the data in section 1.2:
 | 20   | Complete Remission | 1                | 6+            |
 | 21   | Complete Remission | 8                | 10+           |
 
-
 **(a) Answer:**
 
 $L(\lambda)=\prod_{i=1}^{n}\lambda e^{-\lambda x_i}\prod_{j=1}^{m}e^{-\lambda x_j}$
@@ -291,7 +289,8 @@ $\frac{dln(L(\lambda))}{d\lambda}=\frac{n}{\lambda}-T$
 
 $\hat{\lambda}=\frac{n}{T}$
 
-Since number of exact lifetime patients is 9. The total observed time is 359.
+Since number of exact lifetime patients is 9. The total observed time is
+359.
 
 $\hat{\lambda}=\frac{9}{359}=0.0251$
 
@@ -301,11 +300,11 @@ $Var(\hat{\lambda})=\frac{\hat{\lambda}^2}{n}=\frac{0.0251^2}{9}=0.00007$
 
 $SE(\hat{\lambda})=\sqrt{Var(\hat{\lambda})}=\sqrt{0.00007}=0.0084$
 
-LB: $\hat{\lambda}-1.96*SE(\hat{\lambda})=0.0251-1.96*0.0084=0.0087$
-UB: $\hat{\lambda}+1.96*SE(\hat{\lambda})=0.0251+1.96*0.0084=0.0415$
+LB: $\hat{\lambda}-1.96*SE(\hat{\lambda})=0.0251-1.96*0.0084=0.0087$ UB:
+$\hat{\lambda}+1.96*SE(\hat{\lambda})=0.0251+1.96*0.0084=0.0415$
 
-LB for S(12): $e^{-0.0415*12}=0.608$
-UB for S(12): $e^{-0.0087*12}=0.901$
+LB for S(12): $e^{-0.0415*12}=0.608$ UB for S(12):
+$e^{-0.0087*12}=0.901$
 
 95% CI for S(12): (0.608, 0.901)
 
@@ -315,20 +314,74 @@ The full log-likelihood is:
 
 $l(\mu, \sigma^2)=\sum_{i=1}^{n}ln(\frac{1}{x_i\sigma\sqrt{2\pi}}e^{-\frac{(ln(x_i)-\mu)^2}{2\sigma^2}})+\sum_{j=1}^{m}ln[1-\Phi(\frac{ln(x_j)-\mu}{\sigma})]$
 
-
-**(c) Answer:**
-
-$H_0:\beta_1=0$: No difference in remission duration between 6-MP and placebo.
-$H_A:\beta_1\neq 0$: Significant difference in remission duration between 6-MP and placebo.
-
 ```{r}
 library(survival)
 
 remission_data <- data.frame(
+  time = c(10, 7, 32, 23, 22, 6, 16, 34, 32, 25, 11, 20, 19, 6, 17, 35, 6, 13, 9, 6, 10),
+  notcensor = c(1,1,0,1,1,1,1,0,0,0,0,0,0,1,0,0,1,1,0,0,0)
+)
+
+lognormal_model <- survreg(Surv(time, notcensor) ~ 1, data = remission_data, dist = "lognormal")
+summary(lognormal_model)
+
+```
+$$\hat{\mu} = intercept = 3.2031$$
+
+$$\hat{\sigma} = scale = exp(-0.0215) = 0.9787295$$
+
+
+```{r}
+mu_hat <- lognormal_model$coefficients[1]
+sigma_hat <- lognormal_model$scale
+vcov <- lognormal_model$var
+
+var_mu <- vcov[1,1]  
+var_sigma <- vcov[2,2]  
+cov_mu_sigma <- vcov[1,2]  
+
+# Compute survival probability S(12)
+log_12 <- log(12)
+z <- (log_12 - mu_hat) / sigma_hat
+S_12 <- 1 - pnorm(z)  # Survival probability
+
+print(paste0("S(12) is ", S_12))
+# Partial derivatives
+phi <- dnorm(z)  # PDF of the standard normal at z
+derivative_mu <- phi / sigma_hat
+derivative_sigma <- phi * (log_12 - mu_hat) / sigma_hat^2
+
+# Variance of S(12)
+var_S_12 <- derivative_mu^2 * var_mu + derivative_sigma^2 * var_sigma + 2 * derivative_mu * derivative_sigma * cov_mu_sigma
+se_S_12 <- sqrt(var_S_12)  # Standard error
+
+# 95% Confidence Interval for S(12)
+lower <- S_12 - 1.96 * se_S_12
+upper <- S_12 + 1.96 * se_S_12
+
+print(paste0("95% CI for S(12): (", lower, ",", upper, ")"))
+```
+
+
+**(c) Answer:**
+
+$H_0:\beta_1=0$: No difference in remission duration between 6-MP and
+placebo. $H_A:\beta_1\neq 0$: Significant difference in remission
+duration between 6-MP and placebo.
+
+The form of the model is:
+
+$$\log(T)=\beta_0+\beta_1*treatment+\epsilon$$
+
+The Exponential AFT model assumes that the time to event follows an exponential distribution.
+
+```{r}
+
+remission_data <- data.frame(
   time = c(1, 22, 3, 12, 8, 17, 2, 11, 8, 12, 2, 5, 4, 15, 8, 23, 5, 11, 4, 1, 8, 
            10, 7, 32, 23, 22, 6, 16, 34, 32, 25, 11, 20, 19, 6, 17, 35, 6, 13, 9, 6, 10),
-  status = c(rep(1, 21), rep(1, 21)), 
-  group = c(rep("Placebo", 21), rep("6-MP", 21))
+  status = c(rep(1, 21), 1,1,0,1,1,1,1,0,0,0,0,0,0,1,0,0,1,1,0,0,0), 
+  group = c(rep(0, 21), rep(1, 21))
 )
 
 exp_aft_model <- survreg(Surv(time, status) ~ group, data = remission_data, dist = "exponential")
@@ -336,9 +389,21 @@ exp_aft_model <- survreg(Surv(time, status) ~ group, data = remission_data, dist
 summary(exp_aft_model)
 
 ```
-Since p is 0.028 greater than 0.05, we reject the null hypothesis and conclude that there is a significant difference in remission duration between 6-MP and placebo.
+
+Since p is 0.00013 smaller than 0.05, we reject the null hypothesis and
+conclude that there is a significant difference in remission duration
+between 6-MP and placebo.
 
 **(d) Answer:**
+
+$H_0:\beta_1=0$: No difference in remission duration between 6-MP and
+placebo. $H_A:\beta_1\neq 0$: Significant difference in remission
+duration between 6-MP and placebo.
+
+The form of the model is:
+
+$$\log(T)=\beta_0+\beta_1*treatment+\epsilon$$
+The Weibull AFT model generalizes the Exponential AFT model by allowing a non-constant hazard rate, characterized by the shape parameter k.
 
 ```{r}
 weibull_aft_model <- survreg(Surv(time, status) ~ group, data = remission_data, dist = "weibull")
@@ -346,8 +411,14 @@ weibull_aft_model <- survreg(Surv(time, status) ~ group, data = remission_data, 
 summary(weibull_aft_model)
 ```
 
-Since p is 0.0013 less than 0.05, we reject the null hypothesis and conclude that there is a significant difference in remission duration between 6-MP and placebo.
+Since p is 4.5e-05 less than 0.05, we reject the null hypothesis and
+conclude that there is a significant difference in remission duration
+between 6-MP and placebo.
 
 Compare to the exponential AFT model:
 
-The Weibull model detects an increasing hazard rate ( k = 1/scale = 1.574 ), meaning the likelihood of relapse grows over time. The exponential model assumes a constant hazard rate ( k = 1 ), which may oversimplify the data. Also, the Weibull model has a higher log-likelihood and a more significant improvement in fit ( p = 0.0025 ).
+The Weibull model detects an increasing hazard rate ( k = 1/scale =
+1.366 ), meaning the likelihood of relapse grows over time. The
+exponential model assumes a constant hazard rate ( k = 1 ), which may
+oversimplify the data. Also, the Weibull model has a higher
+log-likelihood and a more significant improvement in fit ( p = 4.5e-05 ).

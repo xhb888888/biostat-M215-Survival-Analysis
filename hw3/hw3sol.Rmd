@@ -1,0 +1,458 @@
+---
+title: "BIOSTAT M215 HW3"
+subtitle: Hanbei Xiong
+output:
+  html_document:
+    toc: no
+    df_print: paged
+  pdf_document:
+    toc: no
+    number_sections: no
+    keep_tex: yes
+    latex_engine: xelatex
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.height=3)
+```
+
+```{r}
+library(KMsurv)
+library(survival)
+```
+
+
+# 4.7
+
+Consider a hypothetical study of the mortality experience of diabetics.
+Thirty diabetic subjects are recruited at a clinic and followed until death
+or the end of the study. The subject’s age at entry into the study and
+their age at the end of study or death are given in the table below. Of
+interest is estimating the survival curve for a 60- or for a 70-year-old
+diabetic.
+
+(a) Since the diabetics needed to survive long enough from birth until
+the study began, the data is left truncated. Construct a table showing
+the number of subjects at risk, Y , as a function of age.
+
+(b) Estimate the conditional survival function for the age of death of a
+diabetic patient who has survived to age 60.
+
+(c) Estimate the conditional survival function for the age of death of a
+diabetic patient who has survived to age 70.
+
+(d) Suppose an investigator incorrectly ignored the left truncation and
+simply treated the data as right censored. Repeat parts a–c.
+
+| Entry Age | Exit Age | Death Indicator |
+|-----------|---------|----------------|
+| 58        | 60      | 1              |
+| 58        | 63      | 1              |
+| 59        | 69      | 0              |
+| 60        | 62      | 1              |
+| 60        | 65      | 1              |
+| 61        | 72      | 0              |
+| 61        | 69      | 0              |
+| 62        | 73      | 0              |
+| 62        | 66      | 1              |
+| 62        | 65      | 1              |
+| 63        | 68      | 1              |
+| 63        | 74      | 0              |
+| 64        | 71      | 1              |
+| 66        | 68      | 1              |
+| 66        | 69      | 1              |
+| 67        | 70      | 1              |
+| 67        | 77      | 1              |
+| 67        | 69      | 1              |
+| 68        | 72      | 1              |
+| 69        | 79      | 0              |
+| 69        | 72      | 1              |
+| 69        | 70      | 1              |
+| 69        | 71      | 1              |
+| 70        | 76      | 0              |
+| 70        | 78      | 0              |
+| 71        | 79      | 0              |
+| 72        | 76      | 1              |
+| 72        | 73      | 1              |
+| 73        | 80      | 0              |
+| 73        | 74      | 1              |
+
+**(a) Answer:**
+
+```{r}
+diabetes_data <- data.frame(
+  entry_age = c(58, 58, 59, 60, 60, 61, 61, 62, 62, 62, 
+                63, 63, 64, 66, 66, 67, 67, 67, 68, 69, 
+                69, 69, 69, 70, 70, 71, 72, 72, 73, 73),
+  exit_age = c(60, 63, 69, 62, 65, 72, 69, 73, 66, 65,
+               68, 74, 71, 68, 69, 70, 77, 69, 72, 79, 
+               72, 70, 71, 76, 78, 79, 76, 73, 80, 74),
+  death = c(1, 1, 0, 1, 1, 0, 0, 0, 1, 1,
+            1, 0, 1, 1, 1, 1, 1, 1, 1, 0,
+            1, 1, 1, 0, 0, 0, 1, 1, 0, 1)  # 1 = died, 0 = censored
+)
+
+# Compute number at risk at each age
+risk_table <- data.frame(age = sort(unique(c(diabetes_data$entry_age, diabetes_data$exit_age))))
+risk_table$at_risk <- sapply(risk_table$age, function(x) sum(diabetes_data$entry_age <= x & diabetes_data$exit_age >= x))
+
+# Plot number at risk over age
+plot(risk_table$age, risk_table$at_risk, type="s", col="blue", lwd=2, 
+     xlab="Age", ylab="Number at Risk", main="Number of Subjects at Risk Over Age")
+```
+
+
+**(b) Answer:**
+
+```{r}
+# Fit Kaplan-Meier estimator with left truncation and right censoring
+km_fit_60 <- survfit(Surv(entry_age, exit_age, death) ~ 1, data = diabetes_data, subset = (entry_age >= 60))
+
+# Plot survival curve for age ≥ 60
+plot(km_fit_60, xlab = "Age", ylab = "Survival Probability", 
+     main = "Conditional Survival Curve (Age ≥ 60)", col="red", lwd=2)
+```
+
+**(c) Answer:**
+
+```{r}
+# Fit Kaplan-Meier estimator for patients aged 70 or older
+km_fit_70 <- survfit(Surv(entry_age, exit_age, death) ~ 1, data = diabetes_data, subset = (entry_age >= 70))
+
+# Plot survival curve for age ≥ 70
+plot(km_fit_70, xlab = "Age", ylab = "Survival Probability", 
+     main = "Conditional Survival Curve (Age ≥ 70)", col="blue", lwd=2)
+```
+
+**(d) Answer:**
+
+```{r}
+# Compute number at risk ignoring left truncation
+risk_table_naive <- data.frame(age = sort(unique(diabetes_data$exit_age)))
+risk_table_naive$at_risk <- sapply(risk_table_naive$age, function(x) sum(diabetes_data$exit_age >= x))
+
+# Plot number at risk over age (Incorrect Analysis)
+plot(risk_table_naive$age, risk_table_naive$at_risk, type="s", col="blue", lwd=2, 
+     xlab="Age", ylab="Number at Risk", main="Number of Subjects at Risk (Ignoring Left Truncation)")
+```
+```{r}
+# Fit Kaplan-Meier estimator ignoring left truncation (Incorrect)
+km_fit_60_naive <- survfit(Surv(exit_age, death) ~ 1, data = diabetes_data, subset = (exit_age >= 60))
+
+# Plot survival curve for age ≥ 60 (Incorrect)
+plot(km_fit_60_naive, xlab = "Age", ylab = "Survival Probability", 
+     main = "Conditional Survival Curve (Age ≥ 60, Ignoring Left Truncation)", col="red", lwd=2)
+```
+
+```{r}
+# Fit Kaplan-Meier estimator for patients aged 70 or older (Incorrect)
+km_fit_70_naive <- survfit(Surv(exit_age, death) ~ 1, data = diabetes_data, subset = (exit_age >= 70))
+
+# Plot survival curve for age ≥ 70 (Incorrect)
+plot(km_fit_70_naive, xlab = "Age", ylab = "Survival Probability", 
+     main = "Conditional Survival Curve (Age ≥ 70, Ignoring Left Truncation)", col="blue", lwd=2)
+```
+
+
+# 4.8
+
+Table 1.7 reports the results of a study on the survival times of patients
+admitted to a psychiatric hospital. In this data set patients were admitted
+to the hospital at a random age and followed until death or the end of
+the study. Let X be the patient’s age at death. Note that the data we have on X is left truncated by the patient’s age at entry into the hospital and right censored by the end of the study.
+
+(a) Plot the number at risk, Yi , as a function of age.
+
+(b) Estimate the conditional survival function for a psychiatric patient
+who has survived to age 30 without entering a psychiatric hospital.
+
+
+## Table 1.7
+
+| Gender | Age at Admission | Time of Follow-up |
+|--------|----------------|------------------|
+| Female | 51             | 1                |
+| Female | 58             | 1                |
+| Female | 55             | 2                |
+| Female | 28             | 22               |
+| Male   | 21             | 30⁺              |
+| Male   | 19             | 28               |
+| Female | 25             | 32               |
+| Female | 48             | 11               |
+| Female | 47             | 14               |
+| Female | 25             | 36⁺              |
+| Female | 31             | 31⁺              |
+| Male   | 24             | 33⁺              |
+| Male   | 25             | 33⁺              |
+| Female | 30             | 37⁺              |
+| Female | 33             | 35⁺              |
+| Male   | 36             | 25               |
+| Male   | 30             | 31⁺              |
+| Male   | 41             | 22               |
+| Female | 43             | 26               |
+| Female | 45             | 24               |
+| Female | 35             | 35⁺              |
+| Male   | 29             | 34⁺              |
+| Male   | 35             | 30⁺              |
+| Male   | 32             | 35               |
+| Female | 36             | 40               |
+| Male   | 32             | 39⁺              |
+
+⁺ Censored observation
+
+**(a) Answer:**
+
+```{r}
+data <- data.frame(
+  gender = c("Female", "Female", "Female", "Female", "Male", "Male", "Female", "Female", "Female", "Female",
+             "Female", "Male", "Male", "Female", "Female", "Male", "Male", "Male", "Female", "Female",
+             "Female", "Male", "Male", "Male", "Female", "Male"),
+  age_at_admission = c(51, 58, 55, 28, 21, 19, 25, 48, 47, 25,
+                       31, 24, 25, 30, 33, 36, 30, 41, 43, 45,
+                       35, 29, 35, 32, 36, 32),
+  follow_up_time = c(1, 1, 2, 22, 30, 28, 32, 11, 14, 36,
+                     31, 33, 33, 37, 35, 25, 31, 22, 26, 24,
+                     35, 34, 30, 35, 40, 39),
+  censored = c(0, 0, 0, 0, 1, 0, 1, 0, 0, 1,
+               1, 1, 1, 1, 1, 0, 1, 0, 0, 0,
+               1, 1, 1, 0, 0, 1) # 1 = censored, 0 = event observed
+)
+
+# Compute age at event (death or censoring)
+data$age_at_event <- data$age_at_admission + data$follow_up_time
+
+# Create survival object with left-truncation (age at admission) and right-censoring
+surv_obj <- Surv(time = data$age_at_admission, time2 = data$age_at_event, event = 1 - data$censored)
+
+# Fit Kaplan-Meier estimator
+km_fit <- survfit(surv_obj ~ 1, data = data)
+
+# Plot the number at risk
+plot(km_fit, fun = "cumhaz", col = "blue", xlab = "Age", ylab = "Cumulative Hazard", main = "Number at Risk Over Age")
+```
+
+**(b) Answer:**
+
+```{r}
+# Estimate survival function conditional on survival to age 30
+km_fit_30 <- survfit(Surv(age_at_admission, age_at_event, 1 - censored) ~ 1, data = data, subset = (age_at_admission >= 30))
+
+summary(km_fit_30)
+```
+
+
+# 7.2
+
+In Exercise 5 of Chapter 6, the survival experience of patients given
+an autologous transplant was compared to a postulated exponential
+survival rate with a hazard rate of 0.045. Using the data in Table 1.4
+of Chapter 1, test the hypothesis that the hazard rate of these auto
+transplant patients is equal to 0.045 against the alternative that it is
+larger than 0.045 using the one-sample, log-rank test. Repeat this test
+using a weight function which gives heavier weight to departures early
+in time from this hazard rate.
+
+**Answer:**
+
+```{r}
+data(kidney)
+```
+
+```{r}
+timevar <- kidney$time
+delta   <- kidney$delta
+
+null_surv <- exp(-0.045 * timevar) #Expected survival probability
+
+survdiff(Surv(timevar, delta) ~ offset(null_surv))
+```
+```{r}
+survdiff(Surv(timevar, delta) ~ offset(null_surv), rho=1)
+```
+The log rank test which gives equal weight to all time point has a p-value of 9.55e-04 The log rank test which gives heavier weight to departures early in time from the hazard rate has a p-value of 0.0016. Hence, we reject the null hypothesis that the hazard rate of these auto transplant patients is equal to 0.045 against the alternative that it is larger than 0.045.
+
+# 7.4
+
+In section 1.11, data from a study of the effect of ploidy on survival for
+patients with tumors of the tongue was reported.
+
+(a) Test the hypothesis that the survival rates of patients with cancer
+of the tongue are the same for patients with aneuploid and diploid
+tumors using the log-rank test.
+
+(b) If primary interest is in detecting differences in survival rates be-
+tween the two types of cancers which occur soon after the diagnosis
+of the cancer, repeat part a using a more appropriate test statistic.
+
+**(a) Answer:**
+
+```{r}
+data(tongue)
+```
+
+```{r}
+survdiff(Surv(time, delta) ~ type, data = tongue, rho = 0)
+```
+
+Since p = 0.09, we fail to reject the null hypothesis that the survival rates of patients with cancer of the tongue are the same for patients with aneuploid and diploid tumors.
+
+**(b) Answer:**
+
+```{r}
+survdiff(Surv(time, delta) ~ type, data = tongue, rho = 2)
+```
+
+Since p = 0.06, we fail to reject the null hypothesis that the survival rates of patients with cancer of the tongue are the same for patients with aneuploid and diploid tumors.
+
+# 7.9
+
+On our web page, data is reported on the death times of 863 kidney
+transplant patients (see section 1.7). Here, patients can be classified by
+race and sex into one of four groups.
+
+(a) Test the hypothesis that there is no difference in survival between
+the four groups.
+
+(b) Provide individual tests, for each sex, of the hypothesis of no racial
+differences in survival rates. Also, adjusting by stratification for the
+sex of the patient, test the hypothesis that blacks have a higher
+mortality rate than whites.
+
+**(a) Answer:**
+
+```{r}
+data(kidtran)
+```
+
+```{r}
+head(kidtran)
+```
+```{r}
+survdiff(Surv(time, delta) ~ race + gender, data = kidtran)
+```
+
+Since p = 0.2, we fail to reject the null hypothesis that there is no difference in survival between
+the four groups.
+
+**(b) Answer:**
+
+```{r}
+survdiff(Surv(time, delta) ~ race, data = kidtran, subset = (gender == 1))
+```
+Since p = 0.8, we fail to reject the null hypothesis that there is no racial
+differences in survival rates for male.
+
+```{r}
+survdiff(Surv(time, delta) ~ race, data = kidtran, subset = (gender == 2))
+```
+Since p = 0.03, we reject the null hypothesis and conclude there is racial
+differences in survival rates for female
+
+```{r}
+survdiff(Surv(time, delta) ~ race + strata(gender), data = kidtran)
+```
+Since p = 0.3, we fail to reject the null hypothesis that blacks and whites have same
+mortality rate while adjusting sex.
+
+# Additional Problem:
+
+Write an R function to implement the median difference test based on the bootstrap
+standard error estimate and normal approximation for the test statistic, as discussed in the
+Tuesday Feb 11 class.
+
+```{r}
+
+medianDiff_test <- function (timevar1, censor1, timevar2, censor2, B = 1000, 
+    seed = 1234, plots = FALSE) 
+{
+    if (B <= 0) {
+        stop("B should be a positive integer")
+    }
+    if (seed <= 0) {
+        stop("Seed should be a positive integer")
+    }
+    if (length(timevar1) != length(censor1)) {
+        stop("Length of timevar1 and censor1 should be the same")
+    }
+    if (length(timevar2) != length(censor2)) {
+        stop("Length of timevar2 and censor2 should be the same")
+    }
+    set.seed(seed)
+    fit1 <- survfit(Surv(timevar1, censor1) ~ 1, conf.type = "none")
+    fit2 <- survfit(Surv(timevar2, censor2) ~ 1, conf.type = "none")
+    med1 <- unname(quantile(fit1, prob = 0.5))
+    med2 <- unname(quantile(fit2, prob = 0.5))
+    if (is.na(med1)) {
+        stop("Estimated survival time for median for sample 1 (control) not found. Program Stopped.")
+    }
+    else if (is.na(med2)) {
+        stop("Estimated survival time for median for sample 2 (treatment) not found. Program Stopped.")
+    }
+    Qp <- function(t1, c1, t2, c2) {
+        fit1 <- survfit(Surv(t1, c1) ~ 1, conf.type = "none")
+        fit2 <- survfit(Surv(t2, c2) ~ 1, conf.type = "none")
+        med1 <- unname(quantile(fit1, prob = 0.5))
+        if (is.na(med1)) {
+            warning("Estimated survival time for median could not be estimated for bootstrap sample. Largest observed survival time was used instead.")
+            med1 <- max(t1)
+        }
+        t0 <- which.max(fit2$time[fit2$time <= med1])
+        Q <- fit2$surv[t0]
+        return(Q)
+    }
+    Q <- Qp(timevar1, censor1, timevar2, censor2)
+    b.est <- numeric(B)
+    for (i in 1:B) {
+        boot1 <- sample(1:length(timevar1), replace = TRUE)
+        t1.boot <- timevar1[boot1]
+        c1.boot <- censor1[boot1]
+        boot2 <- sample(1:length(timevar2), replace = TRUE)
+        t2.boot <- timevar2[boot2]
+        c2.boot <- censor2[boot2]
+        b.est[i] <- Qp(t1.boot, c1.boot, t2.boot, c2.boot)
+    }
+    se <- sd(b.est)
+    Z <- (Q - 0.5)/se
+    pval <- 2 * (1 - pnorm(abs(Z)))
+    if (plots == TRUE) {
+        plot(fit1, col = "red", ylab = "Estimated Survival Function", 
+            xlab = "Time", main = "Kaplan-Meier Estimates")
+        lines(fit2, lty = 2, col = "blue")
+        legend("topright", c("KM-Estimate for Control Group", 
+            "KM-Estimate for Trt. Group"), lty = c(1, 2), col = c("red", 
+            "blue"), bty = "n", cex = 0.8)
+    }
+    out <- list()
+    out$quantile <- q
+    out$sample1 <- med1
+    out$sample2 <- med2
+    out$Z <- Z
+    out$se <- se
+    out$pval <- round(pval, 3)
+    out$B <- B
+    return(out)
+}
+
+```
+
+
+```{r}
+t1 <- c(1, 63, 105, 129, 182, 216, 250, 262, 301, 301,
+       342, 354, 356, 358, 380, 383, 383, 338, 394, 408, 
+       460, 489, 499, 523, 524, 535, 562, 569, 675, 676, 
+       748, 778, 786, 797, 955, 968, 1000, 1245, 1271, 1420, 
+       1551, 1694, 2363, 2754, 2950)
+t2 <- c(17, 42, 44, 48, 60, 72, 74, 95, 103, 108, 122, 144, 
+       167, 170, 183, 185, 193, 195, 197, 208, 234, 235, 254, 
+       307, 315, 401, 445, 464, 484, 528, 542, 547, 577, 580, 
+       795, 855, 1366, 1577, 2060, 2412, 2486, 2796, 2802, 2934, 2988)
+c1 <- c(rep(1, 43), 0, 0)
+c2 <- c(rep(1, 39), rep(0, 6))
+medianDiff_test(t1,c1,t2,c2)
+```
+
+
+
